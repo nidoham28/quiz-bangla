@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import KotlinModules
 
@@ -19,6 +20,9 @@ struct iosApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onOpenURL { url in
+                    ViewControllerKt.handleSupabaseDeepLink(url: url as NSURL)
+                }
         }
     }
 }

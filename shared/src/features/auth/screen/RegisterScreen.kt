@@ -22,6 +22,7 @@ internal fun RegisterScreen(
     isLoading: Boolean = false,
     errorMessage: String? = null,
     onRegister: suspend (email: String, password: String) -> Boolean = { _, _ -> false },
+    onGoogleSignIn: suspend () -> Unit = {},
     onAuthenticated: () -> Unit = {},
     onLogin: () -> Unit = {},
 ) {
@@ -130,6 +131,34 @@ internal fun RegisterScreen(
                     }
                 }
             },
+        )
+
+        Spacer(Modifier.height(18.dp))
+
+        SocialDivider()
+
+        Spacer(Modifier.height(18.dp))
+
+        GoogleButton(
+            onClick = {
+                submitting = true
+                scope.launch {
+                    try {
+                        onGoogleSignIn()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (exception: Exception) {
+                        scope.showFeedback(
+                            snackbarHostState,
+                            exception.toAuthDisplayMessage(),
+                            isError = true,
+                        )
+                    } finally {
+                        submitting = false
+                    }
+                }
+            },
+            enabled = !submitting && !isLoading,
         )
 
         Spacer(Modifier.height(24.dp))

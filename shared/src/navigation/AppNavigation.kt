@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import io.github.jan.supabase.auth.status.SessionStatus
 import features.auth.screen.AuthenticatedScreen
 import features.auth.screen.LoginScreen
 import features.auth.screen.RegisterScreen
@@ -18,6 +19,7 @@ import features.splash.screen.SplashScreen
 import features.auth.screen.toAuthDisplayMessage
 import services.supabase.AuthRepository
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.flow.collect
 
 @Composable
 internal fun AppNavigation() {
@@ -46,6 +48,22 @@ internal fun AppNavigation() {
         return
     }
 
+    LaunchedEffect(initialRoute) {
+        if (initialRoute == AppRoutes.LOGIN) {
+            AuthRepository.sessionStatus.collect { status ->
+                if (
+                    status is SessionStatus.Authenticated &&
+                    navController.currentDestination?.route != AppRoutes.HOME
+                ) {
+                    navController.navigate(AppRoutes.HOME) {
+                        popUpTo(AppRoutes.LOGIN) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = initialRoute,
@@ -61,6 +79,7 @@ internal fun AppNavigation() {
                         launchSingleTop = true
                     }
                 },
+                onGoogleSignIn = AuthRepository::signInWithGoogle,
                 onCreateAccount = {
                     navController.navigate(AppRoutes.REGISTER) {
                         launchSingleTop = true
@@ -72,6 +91,7 @@ internal fun AppNavigation() {
             RegisterScreen(
                 errorMessage = initializationError,
                 onRegister = AuthRepository::signUp,
+                onGoogleSignIn = AuthRepository::signInWithGoogle,
                 onAuthenticated = {
                     navController.navigate(AppRoutes.HOME) {
                         popUpTo(AppRoutes.LOGIN) { inclusive = true }

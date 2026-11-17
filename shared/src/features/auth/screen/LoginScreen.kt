@@ -478,6 +478,7 @@ internal fun LoginScreen(
     isLoading: Boolean = false,
     errorMessage: String? = null,
     onLogin: suspend (email: String, password: String) -> Unit = { _, _ -> },
+    onGoogleSignIn: suspend () -> Unit = {},
     onForgotPassword: () -> Unit = {},
     onCreateAccount: () -> Unit = {},
 ) {
@@ -581,9 +582,24 @@ internal fun LoginScreen(
 
         GoogleButton(
             onClick = {
-                scope.showFeedback(snackbarHostState, "Google sign in is not connected yet.")
+                submitting = true
+                scope.launch {
+                    try {
+                        onGoogleSignIn()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (exception: Exception) {
+                        scope.showFeedback(
+                            snackbarHostState,
+                            exception.toAuthDisplayMessage(),
+                            isError = true,
+                        )
+                    } finally {
+                        submitting = false
+                    }
+                }
             },
-            enabled = true,
+            enabled = !submitting && !isLoading,
         )
 
         Spacer(Modifier.height(24.dp))
