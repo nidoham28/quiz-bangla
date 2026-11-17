@@ -201,65 +201,6 @@ internal fun HomeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        ),
-                        shape = AuraShapes.card,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(AuraTheme.spacing.xl),
-                            verticalArrangement = Arrangement.spacedBy(AuraTheme.spacing.md),
-                        ) {
-                            Text(
-                                text = "Your next quiz starts here",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
-                            Text(
-                                text = "Choose a topic and challenge yourself with $AppName.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
-                            Button(
-                                onClick = {
-                                    scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
-                                },
-                            ) {
-                                Text("Explore topics")
-                            }
-                        }
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(AuraTheme.spacing.md)) {
-                        Text(
-                            text = "Explore topics",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                        TopicCard(
-                            title = "Bangladesh",
-                            description = "Culture, history, and places",
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        )
-                        TopicCard(
-                            title = "General knowledge",
-                            description = "A little bit of everything",
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        )
-                        TopicCard(
-                            title = "Science",
-                            description = "Discover how the world works",
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        )
-                        Text(
-                            text = "Quiz topics are coming soon.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
         }
