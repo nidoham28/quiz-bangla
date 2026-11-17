@@ -5,6 +5,7 @@ product:
 dependencies:
   - $compose.runtime
   - $compose.foundation
+  - $libs.material.icons.core
   - $compose.material3
   - $compose.ui
   - $compose.components.resources
