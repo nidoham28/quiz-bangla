@@ -12,7 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.jan.supabase.auth.status.SessionStatus
-import features.auth.screen.AuthenticatedScreen
+import features.home.screen.HomeScreen
 import features.auth.screen.LoginScreen
 import features.auth.screen.RegisterScreen
 import features.splash.screen.SplashScreen
@@ -102,7 +102,7 @@ internal fun AppNavigation() {
             )
         }
         composable(AppRoutes.HOME) {
-            AuthenticatedScreen(
+            HomeScreen(
                 onSignOut = {
                     AuthRepository.signOut()
                     navController.navigate(AppRoutes.LOGIN) {
