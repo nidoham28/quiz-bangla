@@ -1,8 +1,9 @@
-package features.auth.register.screen
+package features.auth.screen
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -13,12 +14,15 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import features.auth.component.AuthComponent
-import features.auth.login.screen.showFeedback
-import features.auth.login.screen.validateEmail
+import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 
 @Composable
 internal fun RegisterScreen(
-    onRegister: (email: String, password: String) -> Unit = { _, _ -> },
+    isLoading: Boolean = false,
+    errorMessage: String? = null,
+    onRegister: suspend (email: String, password: String) -> Boolean = { _, _ -> false },
+    onAuthenticated: () -> Unit = {},
     onLogin: () -> Unit = {},
 ) {
     val authComponent = remember { AuthComponent() }
@@ -30,6 +34,13 @@ internal fun RegisterScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     var attempted by remember { mutableStateOf(false) }
+    var submitting by remember { mutableStateOf(false) }
+
+    LaunchedEffect(errorMessage) {
+        if (errorMessage != null) {
+            scope.showFeedback(snackbarHostState, errorMessage, isError = true)
+        }
+    }
 
     val emailError = if (attempted) validateEmail(email) else null
     val passwordError = if (attempted && password.isBlank()) "Password is required" else null
@@ -78,7 +89,7 @@ internal fun RegisterScreen(
 
         authComponent.PrimaryButton(
             text = "Create account",
-            loading = false,
+            loading = submitting || isLoading,
             onClick = {
                 attempted = true
                 val emailValidation = validateEmail(email)
@@ -93,7 +104,30 @@ internal fun RegisterScreen(
                 if (validationError != null) {
                     scope.showFeedback(snackbarHostState, validationError, isError = true)
                 } else {
-                    onRegister(email.trim(), password)
+                    submitting = true
+                    scope.launch {
+                        try {
+                            val signedIn = onRegister(email.trim(), password)
+                            if (signedIn) {
+                                onAuthenticated()
+                            } else {
+                                scope.showFeedback(
+                                    snackbarHostState,
+                                    "Account created. Check your email to confirm your account before logging in.",
+                                )
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (exception: Exception) {
+                            scope.showFeedback(
+                                snackbarHostState,
+                                exception.toAuthDisplayMessage(),
+                                isError = true,
+                            )
+                        } finally {
+                            submitting = false
+                        }
+                    }
                 }
             },
         )

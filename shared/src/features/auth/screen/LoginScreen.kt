@@ -1,4 +1,4 @@
-package features.auth.login.screen
+package features.auth.screen
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,7 +36,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -71,9 +69,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -81,18 +76,15 @@ import androidx.compose.ui.unit.sp
 import io.aurafeed.quiz.resources.Res
 import io.aurafeed.quiz.resources.app_logo
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import features.auth.component.AuthComponent
+import kotlin.coroutines.cancellation.CancellationException
 
 internal val AuthFieldShape = RoundedCornerShape(16.dp)
 internal val AuthButtonShape = RoundedCornerShape(28.dp)
 
-private val WHITESPACE = Regex("\\s")
 private val EMAIL_REGEX = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
-
-internal fun String.stripWhitespace(): String = replace(WHITESPACE, "")
 
 internal fun validateEmail(value: String): String? {
     val normalized = value.trim()
@@ -123,6 +115,9 @@ internal fun CoroutineScope.showFeedback(
         host.showSnackbar(FeedbackVisuals(message, isError))
     }
 }
+
+internal fun Exception.toAuthDisplayMessage(): String =
+    message?.takeIf { it.isNotBlank() } ?: "Unable to complete the request. Please try again."
 
 @Composable
 private fun AuthSnackbarHost(state: SnackbarHostState) {
@@ -482,7 +477,7 @@ internal fun LoginScreen(
     appName: String = "Quiz Bangla",
     isLoading: Boolean = false,
     errorMessage: String? = null,
-    onLogin: (email: String, password: String) -> Unit = { _, _ -> },
+    onLogin: suspend (email: String, password: String) -> Unit = { _, _ -> },
     onForgotPassword: () -> Unit = {},
     onCreateAccount: () -> Unit = {},
 ) {
@@ -561,9 +556,19 @@ internal fun LoginScreen(
 
                 submitting = true
                 scope.launch {
-                    delay(700)
-                    submitting = false
-                    onLogin(email.trim(), password)
+                    try {
+                        onLogin(email.trim(), password)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (exception: Exception) {
+                        scope.showFeedback(
+                            snackbarHostState,
+                            exception.toAuthDisplayMessage(),
+                            isError = true,
+                        )
+                    } finally {
+                        submitting = false
+                    }
                 }
             },
         )

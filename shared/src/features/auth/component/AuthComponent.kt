@@ -11,14 +11,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import features.auth.login.screen.AuthFieldShape
-import features.auth.login.screen.AuthFooter
-import features.auth.login.screen.AuthHeader
-import features.auth.login.screen.AuthIllustration
-import features.auth.login.screen.AuthPrimaryButton
-import features.auth.login.screen.AuthScaffold
-import features.auth.login.screen.PasswordVisibilityToggle
-import features.auth.login.screen.authFieldColors
+import features.auth.screen.AuthFieldShape
+import features.auth.screen.AuthFooter
+import features.auth.screen.AuthHeader
+import features.auth.screen.AuthIllustration
+import features.auth.screen.AuthPrimaryButton
+import features.auth.screen.AuthScaffold
+import features.auth.screen.PasswordVisibilityToggle
+import features.auth.screen.authFieldColors
 
 internal class AuthComponent {
     @Composable
