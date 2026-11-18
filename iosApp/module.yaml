@@ -3,6 +3,7 @@ product: ios/app
 dependencies:
   - //shared
   - $compose.ui
+  - $libs.supabase.auth
 
 settings:
   compose: enabled

@@ -3,6 +3,7 @@ product: wasm-js/app
 dependencies:
   - //shared
   - $compose.ui
+  - $libs.supabase.auth
 
 settings:
   compose: enabled
