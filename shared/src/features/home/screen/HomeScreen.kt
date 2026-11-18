@@ -1,5 +1,3 @@
-@file:Suppress("UNCHECKED_CAST")
-
 package features.home.screen
 
 import androidx.compose.foundation.Canvas
@@ -15,15 +13,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FabPosition
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -38,19 +42,20 @@ import ui.theme.auroraBackdrop
 
 @Composable
 internal fun HomeScreen(
-    /** Null shows a "coming soon" message until quizzes exist. */
-    onPlay: (() -> Unit)? = null,
+    /** A null callback shows a "coming soon" message until that feature exists. */
+    onPlayClassics: (() -> Unit)? = null,
+    onPlayChallenge: (() -> Unit)? = null,
+    onPlayCustom: (() -> Unit)? = null,
+    onAddDataset: (() -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    val play: () -> Unit = remember(onPlay) {
-        (onPlay ?: {
-            scope.launch {
-                snackbarHostState.currentSnackbarData?.dismiss()
-                snackbarHostState.showSnackbar("Quizzes are coming soon")
-            }
-        }) as () -> Unit
+    fun showComingSoon() {
+        scope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar("Coming soon")
+        }
     }
 
     Box(
@@ -62,7 +67,14 @@ internal fun HomeScreen(
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
-            floatingActionButton = { PlayButton(onClick = play) },
+            floatingActionButton = {
+                PlayMenuButton(
+                    onPlayClassics = onPlayClassics ?: { showComingSoon() },
+                    onPlayChallenge = onPlayChallenge ?: { showComingSoon() },
+                    onPlayCustom = onPlayCustom ?: { showComingSoon() },
+                    onAddDataset = onAddDataset ?: { showComingSoon() },
+                )
+            },
             floatingActionButtonPosition = FabPosition.End,
         ) { innerPadding ->
             // Screen content goes here; the Play button lives in the FAB slot.
@@ -71,6 +83,56 @@ internal fun HomeScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
                     .padding(AuraTheme.spacing.md),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayMenuButton(
+    onPlayClassics: () -> Unit,
+    onPlayChallenge: () -> Unit,
+    onPlayCustom: () -> Unit,
+    onAddDataset: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    // The menu is anchored to this Box, so it pops up next to the button.
+    Box {
+        PlayButton(onClick = { expanded = true })
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text("Play Classics") },
+                onClick = {
+                    expanded = false
+                    onPlayClassics()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("Play Challenge") },
+                onClick = {
+                    expanded = false
+                    onPlayChallenge()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("Play Custom") },
+                onClick = {
+                    expanded = false
+                    onPlayCustom()
+                },
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Add Dataset (Admin)") },
+                onClick = {
+                    expanded = false
+                    onAddDataset()
+                },
             )
         }
     }

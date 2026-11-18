@@ -16,26 +16,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import io.aurafeed.quiz.resources.Res
 import io.aurafeed.quiz.resources.app_logo
-import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 import ui.theme.*
-import kotlin.time.Duration.Companion.milliseconds
-
-private val SplashDuration = 2_500.milliseconds
 
 @Composable
-internal fun SplashScreen(
-    appName: String = "Quiz Game",
-    onContinue: () -> Unit,
-) {
-    // Always call the latest lambda, even if the caller recomposes during the delay.
-    val currentOnContinue by rememberUpdatedState(onContinue)
+internal fun SplashScreen(appName: String = "Quiz Game") {
     var entered by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         entered = true
-        delay(SplashDuration)
-        currentOnContinue()
     }
 
     // One orchestrated entrance: logo settles in, then the name, then the footer.

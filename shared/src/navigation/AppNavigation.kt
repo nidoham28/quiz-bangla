@@ -12,6 +12,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import features.home.screen.HomeScreen
 import features.auth.screen.LoginScreen
 import features.auth.screen.RegisterScreen
@@ -19,7 +22,7 @@ import features.splash.screen.SplashScreen
 import features.auth.screen.toAuthDisplayMessage
 import services.supabase.AuthRepository
 import kotlin.coroutines.cancellation.CancellationException
-import kotlinx.coroutines.flow.collect
+import kotlin.time.Duration.Companion.seconds
 
 @Composable
 internal fun AppNavigation() {
@@ -28,23 +31,28 @@ internal fun AppNavigation() {
     var initializationError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        try {
-            startDestination = if (AuthRepository.hasActiveSession()) {
-                AppRoutes.HOME
-            } else {
-                AppRoutes.LOGIN
+        val sessionCheck = async {
+            try {
+                AuthRepository.hasActiveSession()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (exception: Exception) {
+                initializationError = exception.toAuthDisplayMessage()
+                false
             }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (exception: Exception) {
-            initializationError = exception.toAuthDisplayMessage()
-            startDestination = AppRoutes.LOGIN
+        }
+
+        delay(2.seconds)
+        startDestination = if (sessionCheck.await()) {
+            AppRoutes.HOME
+        } else {
+            AppRoutes.LOGIN
         }
     }
 
     val initialRoute = startDestination
     if (initialRoute == null) {
-        SplashScreen(onContinue = {})
+        SplashScreen()
         return
     }
 
@@ -103,7 +111,6 @@ internal fun AppNavigation() {
         }
         composable(AppRoutes.HOME) {
             HomeScreen(
-                onPlay = null
             )
         }
     }
