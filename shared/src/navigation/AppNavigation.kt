@@ -16,6 +16,7 @@ import features.auth.screen.LoginScreen
 import features.auth.screen.RegisterScreen
 import features.auth.screen.toAuthDisplayMessage
 import features.home.screen.HomeScreen
+import features.questions.screen.AddQuestionsScreen
 import features.splash.screen.SplashScreen
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.delay
@@ -57,10 +58,12 @@ internal fun AppNavigation() {
             AuthRepository.sessionStatus.collect { status ->
                 val current = navController.currentDestination?.route
                 when (status) {
-                    is SessionStatus.Authenticated if current != AppRoutes.HOME ->
+                    is SessionStatus.Authenticated
+                        if current != AppRoutes.HOME && current != AppRoutes.ADD_QUESTIONS ->
                         navController.resetTo(AppRoutes.HOME)
 
-                    is SessionStatus.NotAuthenticated if current == AppRoutes.HOME ->
+                    is SessionStatus.NotAuthenticated
+                        if current == AppRoutes.HOME || current == AppRoutes.ADD_QUESTIONS ->
                         navController.resetTo(AppRoutes.LOGIN)
 
                     else -> {}
@@ -98,7 +101,16 @@ internal fun AppNavigation() {
                 )
             }
             composable(AppRoutes.HOME) {
-                HomeScreen()
+                HomeScreen(
+                    onAddQuestions = {
+                        navController.navigate(AppRoutes.ADD_QUESTIONS) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+            composable(AppRoutes.ADD_QUESTIONS) {
+                AddQuestionsScreen(onBack = { navController.popBackStack() })
             }
         }
     }

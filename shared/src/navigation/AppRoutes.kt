@@ -9,4 +9,5 @@ internal object AppRoutes {
     const val LEADERBOARD = "home/leaderboard"
     const val CHAT = "home/chat"
     const val PROFILE = "home/profile"
+    const val ADD_QUESTIONS = "home/add-questions"
 }
