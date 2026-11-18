@@ -174,13 +174,12 @@ private fun supporting(text: String?): (@Composable () -> Unit)? {
     return slot
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AddQuestionsScreen(onBack: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val questions = rememberSaveable(saver = draftQuestionsSaver) {
-        mutableStateListOf<DraftQuestion>()
+        mutableStateListOf()
     }
 
     var title by rememberSaveable { mutableStateOf("") }

@@ -135,9 +135,20 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const requestId = crypto.randomUUID();
   if (request.method !== "POST") {
+    console.warn(JSON.stringify({
+      event: "save_quiz_draft.rejected",
+      request_id: requestId,
+      reason: "method_not_allowed",
+      method: request.method,
+    }));
     return jsonResponse(405, { error: "Method not allowed." });
   }
+  console.info(JSON.stringify({
+    event: "save_quiz_draft.request_received",
+    request_id: requestId,
+  }));
 
   const authorization = request.headers.get("Authorization");
   const bearerMatch = authorization?.trim().match(/^Bearer\s+(\S+)$/i);
@@ -255,15 +266,31 @@ Deno.serve(async (request) => {
     if (error.code === "22023") {
       return jsonResponse(400, { error: error.message });
     }
-    console.error("save_quiz_draft RPC failed:", error);
+    console.error(JSON.stringify({
+      event: "save_quiz_draft.rpc_failed",
+      request_id: requestId,
+      code: error.code,
+      message: error.message,
+    }));
     return jsonResponse(500, { error: "Unable to save this quiz right now." });
   }
 
   if (!data || typeof data !== "object") {
-    console.error("save_quiz_draft returned unexpected data:", data);
+    console.error(JSON.stringify({
+      event: "save_quiz_draft.unexpected_response",
+      request_id: requestId,
+      response_type: typeof data,
+    }));
     return jsonResponse(500, { error: "Unexpected response from quiz saver." });
   }
 
+  console.info(JSON.stringify({
+    event: "save_quiz_draft.completed",
+    request_id: requestId,
+    question_count: payload.questions.length,
+    inserted: data.inserted,
+    skipped: data.skipped,
+  }));
   return jsonResponse(200, {
     quiz_id: data.quiz_id,
     inserted: data.inserted,

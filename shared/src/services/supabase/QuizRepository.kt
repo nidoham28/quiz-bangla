@@ -1,6 +1,5 @@
 package services.supabase
 
-import io.github.jan.supabase.exceptions.RestException
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
@@ -131,19 +130,13 @@ internal object QuizRepository {
             }
         }
 
-        val response = try {
-            SupabaseService.functions.invoke(
-                function = SAVE_DRAFT_FUNCTION,
-                body = request,
-                headers = Headers.build {
-                    append(HttpHeaders.ContentType, "application/json")
-                },
-            )
-        } catch (e: RestException) {
-            val serverMessage = extractErrorMessage(e.error)
-                ?: "Unable to save quiz draft right now."
-            throw IllegalStateException(serverMessage, e)
-        }
+        val response = SupabaseService.functions.invoke(
+            function = SAVE_DRAFT_FUNCTION,
+            body = request,
+            headers = Headers.build {
+                append(HttpHeaders.ContentType, "application/json")
+            },
+        )
 
         val rawResponse = response.bodyAsText()
         val resultObject = json.parseToJsonElement(rawResponse).jsonObject
@@ -155,20 +148,11 @@ internal object QuizRepository {
         )
     }
 
-    private fun isValidHttpsUrl(url: String): Boolean =
-        url.length in 9..MAX_URL_LENGTH &&
-                url.startsWith("https://", ignoreCase = true) &&
-                url.none { it.isWhitespace() }
+    private fun isValidHttpsUrl(url: String): Boolean = url.length in 9..MAX_URL_LENGTH && url.startsWith(
+        "https://",
+        ignoreCase = true
+    ) && url.none { it.isWhitespace() }
 
-    private fun extractErrorMessage(rawError: String): String? =
-        runCatching {
-            json.parseToJsonElement(rawError)
-                .jsonObject["error"]
-                ?.jsonPrimitive
-                ?.contentOrNull
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-        }.getOrNull()
 }
 
 private fun JsonObjectBuilder.putNullable(
