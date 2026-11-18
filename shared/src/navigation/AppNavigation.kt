@@ -103,13 +103,7 @@ internal fun AppNavigation() {
         }
         composable(AppRoutes.HOME) {
             HomeScreen(
-                onSignOut = {
-                    AuthRepository.signOut()
-                    navController.navigate(AppRoutes.LOGIN) {
-                        popUpTo(AppRoutes.HOME) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                },
+                onPlay = null
             )
         }
     }
