@@ -5,6 +5,7 @@ dependencies:
   - $libs.androidx.activity.compose
   - $compose.preview
   - $compose.uiTooling
+  - $libs.supabase.auth
 
 settings:
   compose: enabled

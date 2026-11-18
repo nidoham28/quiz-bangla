@@ -6,7 +6,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,7 +19,7 @@ import org.jetbrains.compose.resources.painterResource
 import ui.theme.*
 
 @Composable
-internal fun SplashScreen(appName: String = "Quiz Game") {
+internal fun SplashScreen() {
     var entered by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -70,32 +69,12 @@ internal fun SplashScreen(appName: String = "Quiz Game") {
                     painter = painterResource(Res.drawable.app_logo),
                     contentDescription = null, // decorative: the app name is shown below
                     modifier = Modifier
-                        .size(120.dp)
+                        .size(180.dp)
                         .auraShadow(AuraElevation.Floating, AuraShapes.avatar)
                         .clip(AuraShapes.avatar),
                     contentScale = ContentScale.Crop,
                 )
             }
-
-            Spacer(Modifier.height(AuraTheme.spacing.xl))
-
-            Text(
-                text = appName,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.graphicsLayer { alpha = nameAlpha },
-            )
         }
-
-        Text(
-            text = "Made in Bangladesh",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(bottom = AuraTheme.spacing.xxl)
-                .graphicsLayer { alpha = footerAlpha },
-        )
     }
 }

@@ -9,14 +9,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.jan.supabase.auth.handleDeeplinks
-import services.supabase.AuthRepository
+import services.supabase.SupabaseService
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (intent.action == Intent.ACTION_VIEW) {
-            AuthRepository.supabaseClient.handleDeeplinks(intent)
+            SupabaseService.instance.handleDeeplinks(intent)
         }
         setContent {
             App()
@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.action == Intent.ACTION_VIEW) {
-            AuthRepository.supabaseClient.handleDeeplinks(intent)
+            SupabaseService.instance.handleDeeplinks(intent)
         }
     }
 }
