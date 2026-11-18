@@ -4,14 +4,14 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
+import io.github.jan.supabase.functions.functions
 // import io.github.jan.supabase.postgrest.Postgrest
 // import io.github.jan.supabase.postgrest.postgrest
 // import io.github.jan.supabase.storage.Storage
 // import io.github.jan.supabase.storage.storage
 // import io.github.jan.supabase.realtime.Realtime
 // import io.github.jan.supabase.realtime.realtime
-// import io.github.jan.supabase.functions.Functions
-// import io.github.jan.supabase.functions.functions
 import io.github.jan.supabase.SupabaseClient as SupabaseClientType
 
 object SupabaseService {
@@ -35,7 +35,7 @@ object SupabaseService {
             // install(Postgrest)
             // install(Storage)
             // install(Realtime)
-            // install(Functions)
+            install(Functions)
         }
     }
 
@@ -44,5 +44,5 @@ object SupabaseService {
     // val postgrest get() = instance.postgrest
     // val storage get() = instance.storage
     // val realtime get() = instance.realtime
-    // val functions get() = instance.functions
+    val functions get() = instance.functions
 }

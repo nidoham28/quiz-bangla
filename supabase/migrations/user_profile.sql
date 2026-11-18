@@ -16,8 +16,8 @@ begin
         select 1 from information_schema.columns
         where table_schema = 'public' and table_name = 'user_profiles' and column_name = 'name'
     ) then
-        alter table public.user_profiles rename column display_name to name;
-    end if;
+alter table public.user_profiles rename column display_name to name;
+end if;
 
     if exists (
         select 1 from information_schema.columns
@@ -26,8 +26,8 @@ begin
         select 1 from information_schema.columns
         where table_schema = 'public' and table_name = 'user_profiles' and column_name = 'avatar'
     ) then
-        alter table public.user_profiles rename column avatar_url to avatar;
-    end if;
+alter table public.user_profiles rename column avatar_url to avatar;
+end if;
 
     -- The previous version used these as numeric activity counters. Preserve
     -- those values under explicit counter names; the requested fields below
@@ -40,8 +40,8 @@ begin
         select 1 from information_schema.columns
         where table_schema = 'public' and table_name = 'user_profiles' and column_name = 'active_days_count'
     ) then
-        alter table public.user_profiles rename column active_days to active_days_count;
-    end if;
+alter table public.user_profiles rename column active_days to active_days_count;
+end if;
 
     if exists (
         select 1 from information_schema.columns
@@ -50,13 +50,24 @@ begin
         select 1 from information_schema.columns
         where table_schema = 'public' and table_name = 'user_profiles' and column_name = 'active_time_seconds_total'
     ) then
-        alter table public.user_profiles rename column active_time_seconds to active_time_seconds_total;
-    end if;
+alter table public.user_profiles rename column active_time_seconds to active_time_seconds_total;
+end if;
+
+    if exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'user_profiles' and column_name = 'active_time'
+          and data_type <> 'text'
+    ) and not exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'user_profiles' and column_name = 'active_time_seconds_total'
+    ) then
+alter table public.user_profiles rename column active_time to active_time_seconds_total;
+end if;
 end;
 $$;
 
 create table if not exists public.user_profiles (
-    id uuid primary key references auth.users (id) on delete cascade,
+                                                    id uuid primary key references auth.users (id) on delete cascade,
     name text,
     description text,
     avatar text,
@@ -79,7 +90,6 @@ create table if not exists public.user_profiles (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
 
-    constraint user_profiles_id_unique unique (id),
     constraint user_profiles_name_length check (name is null or char_length(name) <= 25),
     constraint user_profiles_description_length check (description is null or char_length(description) <= 150),
     constraint user_profiles_gender_allowed check (gender in ('male', 'female', 'unspecified')),
@@ -93,7 +103,7 @@ create table if not exists public.user_profiles (
     constraint user_profiles_currency_nonnegative check (currency_balance >= 0),
     constraint user_profiles_gold_nonnegative check (gold_score >= 0),
     constraint user_profiles_diamond_nonnegative check (diamond_score >= 0)
-);
+    );
 
 -- Add requested columns to a previously-created table, preserving existing rows.
 alter table public.user_profiles
@@ -119,10 +129,9 @@ alter table public.user_profiles
     add column if not exists created_at timestamptz not null default now(),
     add column if not exists updated_at timestamptz not null default now();
 
--- Replace old/looser checks with the requested allowed values and limits.
+-- Replace old/looser check constraints (keep user_profiles_id_unique untouched because other FKs depend on it).
 alter table public.user_profiles
-    drop constraint if exists user_profiles_id_unique,
-    drop constraint if exists user_profiles_name_length,
+drop constraint if exists user_profiles_name_length,
     drop constraint if exists user_profiles_display_name_length,
     drop constraint if exists user_profiles_description_length,
     drop constraint if exists user_profiles_gender_allowed,
@@ -141,7 +150,6 @@ alter table public.user_profiles
     drop constraint if exists user_profiles_diamond_nonnegative;
 
 alter table public.user_profiles
-    add constraint user_profiles_id_unique unique (id),
     add constraint user_profiles_name_length check (name is null or char_length(name) <= 25),
     add constraint user_profiles_description_length check (description is null or char_length(description) <= 150),
     add constraint user_profiles_gender_allowed check (gender in ('male', 'female', 'unspecified')),
@@ -181,15 +189,15 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-    new.updated_at := now();
-    return new;
+    new.updated_at := pg_catalog.now();
+return new;
 end;
 $$;
 
 drop trigger if exists set_user_profiles_updated_at on public.user_profiles;
 create trigger set_user_profiles_updated_at
-before update on public.user_profiles
-for each row execute function public.set_user_profiles_updated_at();
+    before update on public.user_profiles
+    for each row execute function public.set_user_profiles_updated_at();
 
 -- Create a profile once when an Auth user is created.
 create or replace function public.handle_new_auth_user()
@@ -199,50 +207,52 @@ security definer
 set search_path = ''
 as $$
 begin
-    insert into public.user_profiles (
-        id,
-        name,
-        description,
-        avatar,
-        gender,
-        date_of_birth,
-        language,
-        is_verified,
-        is_private,
-        is_banned,
-        is_premium,
-        active_days,
-        active_time,
-        mode,
-        profile_likes_count,
-        experience_score,
-        currency_balance,
-        gold_score,
-        diamond_score
-    )
-    values (
-        new.id,
-        nullif(trim(new.raw_user_meta_data ->> 'name'), ''),
-        null,
-        null,
-        'unspecified',
-        null,
-        'eng',
-        false,
-        false,
-        false,
-        false,
-        'flexible',
-        'flexible',
-        'no_prefs',
-        0,
-        0,
-        1000,
-        1000,
-        1000
-    )
+insert into public.user_profiles (
+    id,
+    name,
+    description,
+    avatar,
+    gender,
+    date_of_birth,
+    language,
+    is_verified,
+    is_private,
+    is_banned,
+    is_premium,
+    status,
+    active_days,
+    active_time,
+    mode,
+    profile_likes_count,
+    experience_score,
+    currency_balance,
+    gold_score,
+    diamond_score
+)
+values (
+           new.id,
+           nullif(trim(left(trim(coalesce(new.raw_user_meta_data ->> 'name', '')), 25)), ''),
+           null,
+           null,
+           'unspecified',
+           null,
+           'eng',
+           false,
+           false,
+           false,
+           false,
+           'active',
+           'flexible',
+           'flexible',
+           'no_prefs',
+           0,
+           0,
+           1000,
+           1000,
+           1000
+       )
     on conflict (id) do nothing;
-    return new;
+return new;
 end;
 $$;
 
@@ -253,26 +263,31 @@ create trigger on_auth_user_created_profile
 
 -- Backfill existing Auth users without resetting any existing profile/balance.
 insert into public.user_profiles (id, name, currency_balance, gold_score, diamond_score)
-select u.id, nullif(trim(u.raw_user_meta_data ->> 'name'), ''), 1000, 1000, 1000
+select
+    u.id,
+    nullif(trim(left(trim(coalesce(u.raw_user_meta_data ->> 'name', '')), 25)), ''),
+    1000,
+    1000,
+    1000
 from auth.users as u
-on conflict (id) do nothing;
+    on conflict (id) do nothing;
 
 alter table public.user_profiles enable row level security;
-revoke all on table public.user_profiles from anon, authenticated;
+revoke all on table public.user_profiles from public, anon, authenticated;
 
--- Owners can read all columns only on their own row (RLS below).
+-- Owners can read allowed columns only on their own row (RLS below).
+-- Note: Because 'status' is omitted, client queries MUST specify columns explicitly instead of SELECT *.
 grant select (
-    id, name, description, avatar, gender, date_of_birth, language,
-    is_verified, is_private, is_banned, is_premium,
-    active_days, active_time, mode, profile_likes_count, experience_score,
-    currency_balance, gold_score, diamond_score, created_at, updated_at
-) on public.user_profiles to authenticated;
+              id, name, description, avatar, gender, date_of_birth, language,
+              is_verified, is_private, is_banned, is_premium,
+              active_days, active_time, mode, profile_likes_count, experience_score,
+              currency_balance, gold_score, diamond_score, created_at, updated_at
+    ) on public.user_profiles to authenticated;
 
--- Public-safe projection. This view intentionally omits DOB, balances, ban/
--- premium flags, activity details and other private/internal fields.
--- Private profiles are absent from this view.
-create or replace view public.public_profiles
-with (security_barrier = true)
+-- Public-safe projection. Drop first so column renames/changes do not fail on migration.
+drop view if exists public.public_profiles;
+create view public.public_profiles
+            with (security_barrier = true)
 as
 select id, name, avatar, description, is_verified, profile_likes_count
 from public.user_profiles
@@ -280,24 +295,23 @@ where is_private = false
   and is_banned = false
   and status = 'active';
 
+revoke all on public.public_profiles from public, anon, authenticated;
 grant select on public.public_profiles to anon, authenticated;
 
 drop policy if exists "Users can read their own profile" on public.user_profiles;
 create policy "Users can read their own profile"
     on public.user_profiles for select to authenticated
-    using ((select auth.uid()) = id);
+                                                using ((select auth.uid()) = id);
 
--- Users can edit these fields only. Balances, likes, experience, badge,
--- ban/premium/account status, activity preferences, mode, ID and timestamps are server-controlled.
--- The account status column is also not granted for client-side reads.
+-- Users can edit these fields only (and only when not banned).
 grant update (name, description, avatar, gender, date_of_birth, language, is_private)
     on table public.user_profiles to authenticated;
+
 drop policy if exists "Users can update their own profile details" on public.user_profiles;
 create policy "Users can update their own profile details"
     on public.user_profiles for update to authenticated
-    using ((select auth.uid()) = id)
-    with check ((select auth.uid()) = id);
-revoke insert, delete on table public.user_profiles from anon, authenticated;
+                                                using ((select auth.uid()) = id and is_banned = false)
+                                with check ((select auth.uid()) = id);
 
 revoke all on function public.handle_new_auth_user() from public, anon, authenticated;
 revoke all on function public.set_user_profiles_updated_at() from public, anon, authenticated;

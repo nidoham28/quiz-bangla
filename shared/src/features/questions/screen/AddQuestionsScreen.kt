@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,8 +55,11 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,18 +67,34 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import services.supabase.QuizOptionDraft
+import services.supabase.QuizQuestionDraft
+import services.supabase.QuizRepository
 
 private const val QUIZ_TITLE_LIMIT = 120
 private const val QUIZ_DESCRIPTION_LIMIT = 1000
 private const val QUESTION_PROMPT_LIMIT = 2000
 private const val OPTION_TEXT_LIMIT = 500
+private const val IMAGE_URL_LIMIT = 2048
+private const val MAX_QUESTIONS_PER_BATCH = 100
 private const val QUESTION_TEXT = "Text"
 private const val QUESTION_IMAGE = "Image"
 private val OPTION_LABELS = listOf("A", "B", "C", "D")
 private val DIFFICULTIES = listOf("Easy", "Medium", "Hard")
 private val FORMATS = listOf(QUESTION_TEXT, QUESTION_IMAGE)
-private val WEB_URL_PATTERN = Regex("^https://[^\\s]+$", RegexOption.IGNORE_CASE)
+private val WEB_URL_PATTERN = Regex("^https://[^\\s/][^\\s]*$", RegexOption.IGNORE_CASE)
 
 private data class DraftOption(
     val text: String?,
@@ -88,7 +108,60 @@ private data class DraftQuestion(
     val correctOption: Int,
 )
 
-private fun isHttpsUrl(value: String) = WEB_URL_PATTERN.matches(value.trim())
+private val draftQuestionsSaver: Saver<SnapshotStateList<DraftQuestion>, String> = Saver(
+    save = { list ->
+        buildJsonArray {
+            list.forEach { question ->
+                add(
+                    buildJsonObject {
+                        put("prompt", question.prompt)
+                        put("imageUrl", question.imageUrl)
+                        put("correctOption", question.correctOption)
+                        putJsonArray("options") {
+                            question.options.forEach { option ->
+                                add(
+                                    buildJsonObject {
+                                        put("text", option.text)
+                                        put("imageUrl", option.imageUrl)
+                                    },
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+        }.toString()
+    },
+    restore = { saved ->
+        runCatching {
+            Json.parseToJsonElement(saved).jsonArray.mapNotNull { element ->
+                val obj = element.jsonObject
+                val options = obj["options"]?.jsonArray?.map { optElement ->
+                    val optObj = optElement.jsonObject
+                    DraftOption(
+                        text = optObj["text"]?.jsonPrimitive?.contentOrNull,
+                        imageUrl = optObj["imageUrl"]?.jsonPrimitive?.contentOrNull,
+                    )
+                } ?: return@mapNotNull null
+
+                if (options.size != 4) return@mapNotNull null
+
+                val correctOption = (obj["correctOption"]?.jsonPrimitive?.intOrNull ?: 0).coerceIn(0, 3)
+                DraftQuestion(
+                    prompt = obj["prompt"]?.jsonPrimitive?.contentOrNull,
+                    imageUrl = obj["imageUrl"]?.jsonPrimitive?.contentOrNull,
+                    options = options,
+                    correctOption = correctOption,
+                )
+            }.toMutableStateList()
+        }.getOrElse { mutableStateListOf<DraftQuestion>() }
+    },
+)
+
+private fun isHttpsUrl(value: String): Boolean {
+    val trimmed = value.trim()
+    return trimmed.length in 9..IMAGE_URL_LIMIT && WEB_URL_PATTERN.matches(trimmed)
+}
 
 /** Shows a character counter only when the user is close to the limit. */
 private fun counterText(length: Int, limit: Int): String? =
@@ -106,7 +179,9 @@ private fun supporting(text: String?): (@Composable () -> Unit)? {
 internal fun AddQuestionsScreen(onBack: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val questions = remember { mutableStateListOf<DraftQuestion>() }
+    val questions = rememberSaveable(saver = draftQuestionsSaver) {
+        mutableStateListOf<DraftQuestion>()
+    }
 
     var title by rememberSaveable { mutableStateOf("") }
     var description by rememberSaveable { mutableStateOf("") }
@@ -121,6 +196,7 @@ internal fun AddQuestionsScreen(onBack: () -> Unit) {
     var showNotice by rememberSaveable { mutableStateOf(true) }
     var attemptedAdd by remember { mutableStateOf(false) }
     var attemptedSave by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
 
     val isTextQuestion = questionFormat == QUESTION_TEXT
     val isTextAnswer = answerFormat == QUESTION_TEXT
@@ -136,13 +212,13 @@ internal fun AddQuestionsScreen(onBack: () -> Unit) {
     val promptError = when {
         !attemptedAdd || questionIsValid -> null
         isTextQuestion -> "Enter the question"
-        else -> "Enter an HTTPS image URL"
+        else -> "Enter a valid HTTPS image URL"
     }
     val optionErrors = currentOptions.map { option ->
         when {
             !attemptedAdd || optionIsValid(option) -> null
             isTextAnswer -> "Enter an answer"
-            else -> "Enter an HTTPS image URL"
+            else -> "Enter a valid HTTPS image URL"
         }
     }
 
@@ -178,6 +254,7 @@ internal fun AddQuestionsScreen(onBack: () -> Unit) {
     }
 
     fun removeQuestion(index: Int) {
+        if (index !in questions.indices) return
         val removed = questions.removeAt(index)
         scope.launch {
             snackbarHostState.currentSnackbarData?.dismiss()
@@ -186,7 +263,7 @@ internal fun AddQuestionsScreen(onBack: () -> Unit) {
                 actionLabel = "Undo",
                 duration = SnackbarDuration.Short,
             )
-            if (result == SnackbarResult.ActionPerformed) {
+            if (result == SnackbarResult.ActionPerformed && !isSaving) {
                 questions.add(index.coerceAtMost(questions.size), removed)
             }
         }
@@ -197,7 +274,73 @@ internal fun AddQuestionsScreen(onBack: () -> Unit) {
         when {
             title.isBlank() -> showMessage("Enter a quiz title first")
             questions.isEmpty() -> showMessage("Add at least one question")
-            else -> showMessage("Can't save yet. A trusted Supabase admin service isn't set up.")
+            isSaving -> Unit
+            else -> {
+                val submittedQuestions = questions.map { question ->
+                    QuizQuestionDraft(
+                        prompt = question.prompt,
+                        imageUrl = question.imageUrl,
+                        options = question.options.map { option ->
+                            QuizOptionDraft(text = option.text, imageUrl = option.imageUrl)
+                        },
+                        correctOption = question.correctOption,
+                    )
+                }
+                val submittedTitle = title.trim()
+                val submittedDescription = description.trim().takeIf { it.isNotEmpty() }
+                val submittedDifficulty = difficulty
+                isSaving = true
+                scope.launch {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    try {
+                        var totalInserted = 0
+                        var totalSkipped = 0
+                        for (batch in submittedQuestions.chunked(MAX_QUESTIONS_PER_BATCH)) {
+                            val result = QuizRepository.saveDraft(
+                                title = submittedTitle,
+                                description = submittedDescription,
+                                difficulty = submittedDifficulty,
+                                questions = batch,
+                            )
+                            totalInserted += result.inserted
+                            totalSkipped += result.skipped
+
+                            batch.forEach { submitted ->
+                                val index = questions.indexOfFirst { current ->
+                                    current.prompt == submitted.prompt &&
+                                            current.imageUrl == submitted.imageUrl &&
+                                            current.correctOption == submitted.correctOption &&
+                                            current.options.map { it.text to it.imageUrl } ==
+                                            submitted.options.map { it.text to it.imageUrl }
+                                }
+                                if (index >= 0) questions.removeAt(index)
+                            }
+                        }
+
+                        attemptedSave = false
+                        val message = when {
+                            totalInserted > 0 && totalSkipped > 0 ->
+                                "Saved $totalInserted questions ($totalSkipped duplicates skipped)"
+                            totalInserted == 0 && totalSkipped > 0 ->
+                                "All $totalSkipped questions were already in this draft"
+                            totalInserted == 1 ->
+                                "1 question saved to Supabase draft"
+                            else ->
+                                "$totalInserted questions saved to Supabase draft"
+                        }
+                        showMessage(message)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (exception: Exception) {
+                        showMessage(
+                            exception.message?.takeIf { it.isNotBlank() }
+                                ?: "Unable to save the quiz. Please try again.",
+                        )
+                    } finally {
+                        isSaving = false
+                    }
+                }
+            }
         }
     }
 
@@ -207,7 +350,9 @@ internal fun AddQuestionsScreen(onBack: () -> Unit) {
                 textOptions = textOptions.toMutableList().also { it[index] = value }
             }
         } else {
-            imageOptions = imageOptions.toMutableList().also { it[index] = value }
+            if (value.length <= IMAGE_URL_LIMIT) {
+                imageOptions = imageOptions.toMutableList().also { it[index] = value }
+            }
         }
     }
 
@@ -256,14 +401,25 @@ internal fun AddQuestionsScreen(onBack: () -> Unit) {
                 ) {
                     OutlinedButton(
                         onClick = { saveDraft() },
+                        enabled = !isSaving,
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
                     ) {
-                        Text("Save draft")
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                            Spacer(Modifier.size(8.dp))
+                            Text("Saving...")
+                        } else {
+                            Text("Save draft")
+                        }
                     }
                     Button(
                         onClick = { addQuestion() },
+                        enabled = !isSaving,
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
@@ -316,7 +472,7 @@ internal fun AddQuestionsScreen(onBack: () -> Unit) {
                             )
                             Spacer(Modifier.size(12.dp))
                             Text(
-                                text = "Drafts stay on this screen only. Saving needs a trusted Supabase admin service, which isn't set up yet.",
+                                text = "Only the authorized quiz editor can save drafts to Supabase.",
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -398,7 +554,9 @@ internal fun AddQuestionsScreen(onBack: () -> Unit) {
                     } else {
                         OutlinedTextField(
                             value = questionImageUrl,
-                            onValueChange = { questionImageUrl = it },
+                            onValueChange = {
+                                if (it.length <= IMAGE_URL_LIMIT) questionImageUrl = it
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
                             label = { Text("Question image URL") },
@@ -443,7 +601,7 @@ internal fun AddQuestionsScreen(onBack: () -> Unit) {
                             DraftQuestionItem(
                                 number = index + 1,
                                 question = question,
-                                onRemove = { removeQuestion(index) },
+                                onRemove = { if (!isSaving) removeQuestion(index) },
                             )
                         }
                     }

@@ -16,6 +16,7 @@ dependencies:
   - $libs.androidx.lifecycle.runtime.compose
   - $libs.androidx.navigation.compose
   - $libs.supabase.auth
+  - $libs.supabase.functions
 
 dependencies@android:
   - $compose.uiTooling
